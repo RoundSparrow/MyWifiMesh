@@ -119,14 +119,11 @@ public class WifiConnection {
                         }
                     }
 
-                    if(broadcaster != null) {
-                        Intent sndeInt = new Intent(DSS_WIFICON_VALUES);
-                        sndeInt.putExtra(DSS_WIFICON_MESSAGE,"DetailedState: " + info.getDetailedState() );
-                        broadcaster.sendBroadcast(sndeInt);
-                    }
+                    // Send message
+                    WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFICON_VALUES, DSS_WIFICON_MESSAGE, "DetailedState: " + info.getDetailedState(), false /* Not error */);
 
-
-                    if(broadcaster != null) {
+                    // Send actual state
+                    if (broadcaster != null) {
                         Intent sndeInt = new Intent(DSS_WIFICON_STATUSVAL);
                         sndeInt.putExtra(DSS_WIFICON_CONSTATUS, mConectionState);
                         broadcaster.sendBroadcast(sndeInt);

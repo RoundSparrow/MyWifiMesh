@@ -72,9 +72,9 @@ public class MyP2PHelper {
 
         showDialogBox(stuff, context);
     }
-    // Dialog box
 
-    static public void showDialogBox(String message,Context context) {
+    // Dialog box
+    public static void showDialogBox(String message,Context context) {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(context);
         alertDialogBuilder.setMessage(message);
 
@@ -90,5 +90,4 @@ public class MyP2PHelper {
         AlertDialog alertDialog = alertDialogBuilder.create();
         alertDialog.show();
     }
-
 }

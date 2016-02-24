@@ -16,7 +16,7 @@ public class ClientSocketHandler extends Thread {
 
     static final public String DSS_CLIENT_VALUES = "test.microsoft.com.mywifimesh.DSS_CLIENT_VALUES";
     static final public String DSS_CLIENT_MESSAGE = "test.microsoft.com.mywifimesh.DSS_CLIENT_MESSAGE";
-
+    static final public int SOCKET_CONNECT_TIMEOUT = 6000;
 
     LocalBroadcastManager broadcaster;
     private static final String TAG = "ClientSocketHandler";
@@ -24,6 +24,7 @@ public class ClientSocketHandler extends Thread {
     private ChatManager chat;
     private String mAddress;
     private int mPort;
+
 
     public ClientSocketHandler(Handler handler, String groupOwnerAddress, int port,Context context) {
         this.broadcaster = LocalBroadcastManager.getInstance(context);
@@ -34,29 +35,25 @@ public class ClientSocketHandler extends Thread {
 
     @Override
     public void run() {
+        InetSocketAddress serverSocketAddress = new InetSocketAddress(mAddress,mPort);
+        WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_CLIENT_VALUES, DSS_CLIENT_MESSAGE, "Attempting socket to server... [" + serverSocketAddress.toString() + "]", false /* Not error */);
         Socket socket = new Socket();
         try {
             socket.bind(null);
-            socket.connect(new InetSocketAddress(mAddress,mPort), 5000);
+            socket.connect(serverSocketAddress, SOCKET_CONNECT_TIMEOUT);
             Log.d(TAG, "Launching the I/O handler");
-            chat = new ChatManager(socket, handler, "Client");
+            chat = new ChatManager(socket, handler, "SocketClient");
             new Thread(chat).start();
+
         } catch (Exception e) {
-            if(broadcaster != null) {
-                Intent intent = new Intent(DSS_CLIENT_VALUES);
-                intent.putExtra(DSS_CLIENT_MESSAGE, e.toString());
-                broadcaster.sendBroadcast(intent);
-            }
+            Log.e(TAG, "Exception ChatManager");
+            e.printStackTrace();
+            WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_CLIENT_VALUES, DSS_CLIENT_MESSAGE, e.toString(), true /* ERROR */);
             try {
                 socket.close();
             } catch (Exception e1) {
-                if(broadcaster != null) {
-                    Intent intent = new Intent(DSS_CLIENT_VALUES);
-                    intent.putExtra(DSS_CLIENT_MESSAGE, e.toString());
-                    broadcaster.sendBroadcast(intent);
-                }
+                WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_CLIENT_VALUES, DSS_CLIENT_MESSAGE, e.toString(), true /* ERROR */);
             }
-            return;
         }
     }
 

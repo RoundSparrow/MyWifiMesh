@@ -13,6 +13,7 @@ import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Log;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -20,7 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION;
-
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION;
 
 
@@ -54,8 +54,8 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
         this.broadcaster = LocalBroadcastManager.getInstance(this.context);
     }
 
-    public void Start() {
 
+    public void Start() {
         p2p = (WifiP2pManager) this.context.getSystemService(this.context.WIFI_P2P_SERVICE);
 
         if (p2p == null) {
@@ -70,13 +70,21 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
             filter.addAction(WIFI_P2P_CONNECTION_CHANGED_ACTION);
             this.context.registerReceiver(receiver, filter);
 
-            p2p.createGroup(channel,new WifiP2pManager.ActionListener() {
+            // Previous run might have it still there.
+            // http://stackoverflow.com/questions/13252573/wifip2pmanager-return-busy-state-on-creategroup/13272405
+            // To prevent "BUSY", remove first.
+            // DISABLED, does not seem to help: removeGroup();
+
+            p2p.createGroup(channel, new WifiP2pManager.ActionListener() {
+                @Override
                 public void onSuccess() {
                     debug_print("Creating Local Group ");
                 }
 
+                @Override
                 public void onFailure(int reason) {
-                    debug_print("Local Group failed, error code " + reason);
+                    String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                    debug_print_error("Local Group failed, error code " + reason + " " + reasonWords);
                 }
             });
         }
@@ -89,13 +97,16 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
     }
 
     public void removeGroup() {
-        p2p.removeGroup(channel,new WifiP2pManager.ActionListener() {
+        p2p.removeGroup(channel, new WifiP2pManager.ActionListener() {
+            @Override
             public void onSuccess() {
                 debug_print("Cleared Local Group ");
             }
 
+            @Override
             public void onFailure(int reason) {
-                debug_print("Clearing Local Group failed, error code " + reason);
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Clearing Local Group FAILed, ERROR code " + reason + " " + reasonWords);
             }
         });
     }
@@ -105,6 +116,7 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
         // see how we could avoid looping
    //     p2p = (WifiP2pManager) this.context.getSystemService(this.context.WIFI_P2P_SERVICE);
    //     channel = p2p.initialize(this.context, this.context.getMainLooper(), this);
+        debug_print("AccessPoint onChannelDisconnected");
     }
 
     @Override
@@ -127,12 +139,13 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
                 startLocalService("NI:" + group.getNetworkName() + ":" + group.getPassphrase() + ":" + mInetAddress);
             }
         } catch(Exception e) {
-            debug_print("onGroupInfoAvailable, error: " + e.toString());
+            Log.e("WifiAccessPoint", "onGroupInfoAvailable Exception", e);
+            e.printStackTrace();
+            debug_print_error("onGroupInfoAvailable, error: " + e.toString());
         }
     }
 
     private void startLocalService(String instance) {
-
         Map<String, String> record = new HashMap<String, String>();
         record.put("available", "visible");
 
@@ -140,12 +153,15 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
 
         debug_print("Add local service :" + instance);
         p2p.addLocalService(channel, service, new WifiP2pManager.ActionListener() {
+            @Override
             public void onSuccess() {
                 debug_print("Added local service");
             }
 
+            @Override
             public void onFailure(int reason) {
-                debug_print("Adding local service failed, error code " + reason);
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Adding local service FAILed, ERROR code " + reason + " " + reasonWords);
             }
         });
     }
@@ -160,7 +176,8 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
             }
 
             public void onFailure(int reason) {
-                debug_print("Clearing local services failed, error code " + reason);
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Clearing local services FAILed, ERROR code " + reason + " " + reasonWords);
             }
         });
     }
@@ -169,29 +186,41 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
     public void onConnectionInfoAvailable(WifiP2pInfo info) {
         try {
             if (info.isGroupOwner) {
-                if(broadcaster != null) {
-                    mInetAddress = info.groupOwnerAddress.getHostAddress();
-                    Intent intent = new Intent(DSS_WIFIAP_SERVERADDRESS);
-                    intent.putExtra(DSS_WIFIAP_INETADDRESS, (Serializable)info.groupOwnerAddress);
-                    broadcaster.sendBroadcast(intent);
+                mInetAddress = null;
+                if (broadcaster != null) {
+                    if (info.groupOwnerAddress == null)
+                    {
+                        debug_print_error("ERROR: ConAvail WifiP2pInfo.groupOwnerAddress null");
+                        Log.e("WifiAccessPoint", "onConnectionInfoAvailable WifiP2pInfo.groupOwnerAddress null");
+                    }
+                    else {
+                        mInetAddress = info.groupOwnerAddress.getHostAddress();
+                        Intent intent = new Intent(DSS_WIFIAP_SERVERADDRESS);
+                        intent.putExtra(DSS_WIFIAP_INETADDRESS, (Serializable) info.groupOwnerAddress);
+                        broadcaster.sendBroadcast(intent);
+                    }
+                }
+                else
+                {
+                    debug_print_error("ERROR: ConAvail broadcaster null");
+                    Log.w("WifiAccessPoint", "onConnectionInfoAvailable broadcaster is null");
                 }
                 p2p.requestGroupInfo(channel,this);
             } else {
-                debug_print("we are client !! group owner address is: " + info.groupOwnerAddress.getHostAddress());
+                debug_print("We are client!! group owner address is: " + mInetAddress);
             }
         } catch(Exception e) {
-            debug_print("onConnectionInfoAvailable, error: " + e.toString());
+            Log.e("WifiAccessPoint", "Exception onConnectionInfoAvailable", e);
+            debug_print_error("onConnectionInfoAvailable, Exception ERROR: " + e.toString());
         }
     }
 
     private void debug_print(String buffer) {
+        WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFIAP_VALUES, DSS_WIFIAP_MESSAGE, buffer, false /* Not error */);
+    }
 
-        if(broadcaster != null) {
-            Intent intent = new Intent(DSS_WIFIAP_VALUES);
-            if (buffer != null)
-                intent.putExtra(DSS_WIFIAP_MESSAGE, buffer);
-            broadcaster.sendBroadcast(intent);
-        }
+    private void debug_print_error(String buffer) {
+        WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFIAP_VALUES, DSS_WIFIAP_MESSAGE, buffer, true /* ERROR */);
     }
 
     private class AccessPointReceiver extends BroadcastReceiver {

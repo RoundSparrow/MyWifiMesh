@@ -1,0 +1,18 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto"
+      xmlns:tools="http://schemas.android.com/tools"
+      tools:context="com.cameracornet.wifirepeater.MainActivity">
+
+    <item
+        android:id="@+id/action_connect_socket"
+        android:orderInCategory="40"
+        android:title="@string/action_connect_socket"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_send_socket"
+        android:orderInCategory="42"
+        android:title="@string/action_send_socket"
+        app:showAsAction="never"/>
+
+</menu>

@@ -148,18 +148,30 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
     }
     private void startPeerDiscovery() {
         p2p.discoverPeers(channel, new WifiP2pManager.ActionListener() {
+            @Override
             public void onSuccess() {
                 myServiceState = ServiceState.DiscoverPeer;
                 debug_print("Started peer discovery");
             }
-            public void onFailure(int reason) {debug_print("Starting peer discovery failed, error code " + reason);}
+
+            @Override
+            public void onFailure(int reason) {
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Starting peer discovery FAILed, ERROR code " + reason + " " + reasonWords);
+            }
         });
     }
 
     private void stopPeerDiscovery() {
         p2p.stopPeerDiscovery(channel, new WifiP2pManager.ActionListener() {
-            public void onSuccess() {debug_print("Stopped peer discovery");}
-            public void onFailure(int reason) {debug_print("Stopping peer discovery failed, error code " + reason);}
+            public void onSuccess() {
+                debug_print("Stopped peer discovery");
+            }
+
+            public void onFailure(int reason) {
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Stopping peer discovery failed, ERROR code " + reason + " " + reasonWords);
+            }
         });
     }
 
@@ -180,7 +192,11 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                                 debug_print("Started service discovery");
                                 myServiceState = ServiceState.DiscoverService;
                             }
-                            public void onFailure(int reason) {debug_print("Starting service discovery failed, error code " + reason);}
+
+                            public void onFailure(int reason) {
+                                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                                debug_print_error("Starting service discovery failed, error code " + reason + " " + reasonWords);
+                            }
                         });
                     }
                 }, 1000);
@@ -196,19 +212,26 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
     private void stopDiscovery() {
         p2p.clearServiceRequests(channel, new WifiP2pManager.ActionListener() {
-            public void onSuccess() {debug_print("Cleared service requests");}
-            public void onFailure(int reason) {debug_print("Clearing service requests failed, error code " + reason);}
+            public void onSuccess() {
+                debug_print("Cleared service requests");
+            }
+
+            public void onFailure(int reason) {
+                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
+                debug_print_error("Clearing service requests failed, error code " + reason + " " + reasonWords);
+            }
         });
     }
-    private void debug_print(String buffer) {
 
-        if(broadcaster != null) {
-            Intent intent = new Intent(DSS_WIFISS_VALUES);
-            if (buffer != null)
-                intent.putExtra(DSS_WIFISS_MESSAGE, buffer);
-            broadcaster.sendBroadcast(intent);
-        }
+
+    private void debug_print(String buffer) {
+        WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFISS_VALUES, DSS_WIFISS_MESSAGE, buffer, false /* Not an error */);
     }
+
+    private void debug_print_error(String buffer) {
+        WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFISS_VALUES, DSS_WIFISS_MESSAGE, buffer, true /* ERROR */);
+    }
+
     private class ServiceSearcherReceiver extends BroadcastReceiver {
 
         @Override

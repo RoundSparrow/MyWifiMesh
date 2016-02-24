@@ -4,13 +4,18 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
 import android.text.format.Formatter;
+import android.text.style.ForegroundColorSpan;
+import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -23,12 +28,17 @@ public class MainActivity extends ActionBarActivity {
 
     public static final String SERVICE_TYPE = "_wdm_p2p._tcp";
 
+    // make static so we can recover on activity recreate.
+    public static String logOutput = "";
+    public static SpannableStringBuilder logOutputSB = new SpannableStringBuilder();
+
     MainActivity that = this;
 
     MyTextSpeech mySpeech = null;
 
     MainBCReceiver mBRReceiver;
     private IntentFilter filter;
+    TextView debugdataBox;
 
     private int mInterval = 1000; // 1 second by default, can be changed later
     private Handler timeHandler;
@@ -89,9 +99,19 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Create a single instance we can share for errors
+        WifiP2pHelper.setDebugLocalBroadcaster(LocalBroadcastManager.getInstance(this.getApplicationContext()));
+
         setContentView(R.layout.activity_main);
 
         mySpeech = new MyTextSpeech(this);
+
+        debugdataBox = ((TextView)findViewById(R.id.debugdataBox));
+        if (debugdataBox != null)
+        {
+            debugdataBox.setText(logOutputSB);
+        }
 
         Button showIPButton = (Button) findViewById(R.id.button3);
         showIPButton.setOnClickListener(new View.OnClickListener() {
@@ -154,7 +174,7 @@ public class MainActivity extends ActionBarActivity {
         filter.addAction(WifiConnection.DSS_WIFICON_SERVERADDRESS);
         filter.addAction(ClientSocketHandler.DSS_CLIENT_VALUES);
         filter.addAction(GroupOwnerSocketHandler.DSS_GROUP_VALUES);
-
+        filter.addAction(WifiP2pHelper.GENERAL_CLIENT_MESSAGE);
 
         LocalBroadcastManager.getInstance(this).registerReceiver((mBRReceiver), filter);
 
@@ -163,12 +183,21 @@ public class MainActivity extends ActionBarActivity {
             groupSocket.start();
             print_line("","Group socketserver started.");
         }catch (Exception e){
-            print_line("", "groupseocket error, :" + e.toString());
+            print_line_error("", "groupseocket error, :" + e.toString());
         }
 
         timeHandler  = new Handler();
         mStatusChecker.run();
     }
+
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_my_wifi_mesh, menu);
+        return true;
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -188,23 +217,62 @@ public class MainActivity extends ActionBarActivity {
 
         timeHandler.removeCallbacks(mStatusChecker);
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mBRReceiver);
+        if (mySpeech != null)
+        {
+            mySpeech.stop();;
+        }
     }
+
 
     public void print_line(String who,String line) {
         timeCounter = 0;
-        ((TextView)findViewById(R.id.debugdataBox)).append(who + " : " + line + "\n");
+        logOutput += who + ": " + line + "\n";
+        logOutputSB.append(who + ": " + line + "\n");
+
+        if (debugdataBox != null) {
+            debugdataBox.append(who + ": " + line + "\n");
+        }
+    }
+
+    public void print_line_error(String who, String line) {
+        timeCounter = 0;
+        logOutput += who + " : " + line + "\n";
+
+        SpannableString newContentSpannableString = new SpannableString(line);
+        newContentSpannableString.setSpan(new ForegroundColorSpan(Color.RED), 0, line.length(), 0);
+
+        logOutputSB.append(who + ": ");
+        logOutputSB.append(newContentSpannableString);
+        logOutputSB.append("\n");
+
+        if (debugdataBox != null) {
+            // debugdataBox.append(who + " : " + line + "\n");
+            debugdataBox.append(who + ": ");
+            debugdataBox.append(newContentSpannableString);
+            debugdataBox.append("\n");
+        }
     }
 
 
     private class MainBCReceiver extends BroadcastReceiver {
 
+        public void routePrintMessage(String outTag, String s, boolean isError)
+        {
+            if (isError)
+                print_line_error(outTag, s);
+            else
+                print_line(outTag, s);
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
+            boolean isError = intent.getBooleanExtra(WifiP2pHelper.EXTRA_ERROR_INDICATOR, false);
+
             if (WifiAccessPoint.DSS_WIFIAP_VALUES.equals(action)) {
                 String s = intent.getStringExtra(WifiAccessPoint.DSS_WIFIAP_MESSAGE);
-                print_line("AP", s);
+                routePrintMessage("_AP", s, isError);
 
             }else if (WifiAccessPoint.DSS_WIFIAP_SERVERADDRESS.equals(action)) {
                 InetAddress address = (InetAddress)intent.getSerializableExtra(WifiAccessPoint.DSS_WIFIAP_INETADDRESS);
@@ -212,8 +280,7 @@ public class MainActivity extends ActionBarActivity {
 
             }else if (WifiServiceSearcher.DSS_WIFISS_VALUES.equals(action)) {
                 String s = intent.getStringExtra(WifiServiceSearcher.DSS_WIFISS_MESSAGE);
-                print_line("SS", s);
-
+                routePrintMessage("_SS", s, isError);
             }else if (WifiServiceSearcher.DSS_WIFISS_PEERCOUNT.equals(action)) {
                 int s = intent.getIntExtra(WifiServiceSearcher.DSS_WIFISS_COUNT, -1);
                 print_line("SS", "found " + s + " peers");
@@ -299,12 +366,13 @@ public class MainActivity extends ActionBarActivity {
                 print_line("COM", "Status " + conStatus);
             }else if (ClientSocketHandler.DSS_CLIENT_VALUES.equals(action)) {
                 String s = intent.getStringExtra(ClientSocketHandler.DSS_CLIENT_MESSAGE);
-                print_line("Client", s);
-
+                routePrintMessage("_Client_", s, isError);
+            }else if (WifiP2pHelper.GENERAL_CLIENT_MESSAGE.equals(action)) {
+                String s = intent.getStringExtra(WifiP2pHelper.GENERAL_MESSAGE_PAYLOAD);
+                routePrintMessage("_GENERAL_", s, isError);
             }else if (GroupOwnerSocketHandler.DSS_GROUP_VALUES.equals(action)) {
                 String s = intent.getStringExtra(GroupOwnerSocketHandler.DSS_GROUP_MESSAGE);
                 print_line("Group", s);
-
             }
         }
     }

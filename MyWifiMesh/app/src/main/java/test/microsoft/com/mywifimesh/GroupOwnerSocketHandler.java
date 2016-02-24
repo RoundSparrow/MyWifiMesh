@@ -26,6 +26,7 @@ public class GroupOwnerSocketHandler extends Thread {
     private static final String TAG = "GroupOwnerSocketHandler";
     private ChatManager chat;
 
+
     public GroupOwnerSocketHandler(Handler handler, int port,Context context) throws IOException {
         try {
             this.broadcaster = LocalBroadcastManager.getInstance(context);
@@ -33,14 +34,9 @@ public class GroupOwnerSocketHandler extends Thread {
             this.handler = handler;
             Log.d("GroupOwnerSocketHandler", "Socket Started");
         } catch (Exception e) {
-            if(broadcaster != null) {
-                Intent intent = new Intent(DSS_GROUP_VALUES);
-                intent.putExtra(DSS_GROUP_MESSAGE, e.toString());
-                broadcaster.sendBroadcast(intent);
-            }
+            WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_GROUP_VALUES, DSS_GROUP_MESSAGE, e.toString(), true /* ERROR */);
             throw e;
         }
-
     }
 
     /**
@@ -67,27 +63,17 @@ public class GroupOwnerSocketHandler extends Thread {
                     if (socket != null && !socket.isClosed())
                         socket.close();
                 } catch (Exception ioe) {
-                    if(broadcaster != null) {
-                        Intent intent = new Intent(DSS_GROUP_VALUES);
-                        intent.putExtra(DSS_GROUP_MESSAGE, ioe.toString());
-                        broadcaster.sendBroadcast(intent);
-                    }
-                }
-                if(broadcaster != null) {
-                    Intent intent = new Intent(DSS_GROUP_VALUES);
-                    intent.putExtra(DSS_GROUP_MESSAGE, e.toString());
-                    broadcaster.sendBroadcast(intent);
+                    WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_GROUP_VALUES, DSS_GROUP_MESSAGE, ioe.toString(), true /* ERROR */);
                 }
 
+                WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_GROUP_VALUES, DSS_GROUP_MESSAGE, e.toString(), true /* ERROR */);
                 break;
             }
         }
     }
 
 
-
     public ChatManager getChat() {
         return chat;
     }
-
 }

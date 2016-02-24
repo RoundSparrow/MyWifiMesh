@@ -19,7 +19,7 @@ public class ChatManager implements Runnable {
     private Handler handler;
     String side;
 
-    public ChatManager(Socket socket, Handler handler,String who) {
+    public ChatManager(Socket socket, Handler handler, String who) {
         this.socket = socket;
         this.handler = handler;
         this.side = who;
@@ -52,15 +52,19 @@ public class ChatManager implements Runnable {
                     handler.obtainMessage(MainActivity.MESSAGE_READ,bytes, -1, buffer).sendToTarget();
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
+                    WifiP2pHelper.forwardDebugPrintGlobal("CM", "IOException Reading " + e.getMessage(), true /* ERROR */);
                 }
             }
         } catch (IOException e) {
+            Log.e(TAG, "IOException ChatManager", e);
+            WifiP2pHelper.forwardDebugPrintGlobal("CM", "IOException " + e.getMessage(), true /* ERROR */);
             e.printStackTrace();
         } finally {
             try {
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                // close on exception doesn't really need to be logged onscreen
+                Log.e(TAG, "IOException ChatManager socket.close()");
             }
         }
     }
@@ -69,6 +73,7 @@ public class ChatManager implements Runnable {
         try {
             oStream.write(buffer);
         } catch (IOException e) {
+            WifiP2pHelper.forwardDebugPrintGlobal("CM", "IOException on WRITE " + e.getMessage(), true /* ERROR */);
             Log.e(TAG, "Exception during write", e);
         }
     }

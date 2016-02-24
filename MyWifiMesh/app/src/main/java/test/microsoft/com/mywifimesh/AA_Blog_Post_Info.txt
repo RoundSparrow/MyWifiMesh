@@ -1,0 +1,34 @@
+Wifi direct, connections without User interaction
+As  I wrote in the UX with Wifi Direct: The connection acceptance dialog article, there is acceptance dialog, which requires User interaction before any data can be exchanged between the devices.
+
+This is not really ideal situation with Thali project, in which we would actually require the connections do be established fully automatically.  To fix this I would have two solutions which might work, depending on requirements:
+
+1. Teach each device, all “Known groups”, so they never ask for the dialog again
+2. Modify the communications to be handled in a way that no dialogs are ever shown.
+
+For the first fix, we could make an app, which you would start and select which mode it would work (either Advertiser who waits for connections, or a devise that initiates the connecting  process), and the app would then do connection and once its verified to work be exchanging some data, they would revert the roles and do new round. While running both devices should have the dialog shown once, and user would then need to click the accept button to store the information in “Known Groups” settings.
+
+This of course would be required to be handled with each device we can potentially have connections between, and would need to be re-done , in case the device is cleaned.
+
+The second fix would require doing the connection a bit differently, in essence the steps are:
+
+1. Use createGroup() function from WifiP2pManager to create a group. This creates an access point, with random SSID and password.
+ - Start same time a server which accepts the incoming connections required for your service
+2. Once the access point is ready, you’ll receive WIFI_P2P_CONNECTION_CHANGED_ACTION. Then fetch the group information to get the SSID & password
+3. Create local service to advertise the access point. You can use the local instance variable for giving the access point information (SSID, password & IP-Address)
+4. Do Service Discovery to find any peers nearby advertising their access points. Once found, see what SSID, password and IP-Address are used with there.
+5. Use WifiManager for forming the connection (instead of WifiP2pManager )
+6. Once the Connection is established,
+A. Stop advertising for the access point.
+B. Remove the access point
+C. Stop searching for additional access points
+7. Make connection to the IP-Address you got from the service you discovered in step 4.
+
+Here’s coupld of pointers to remember with this approach
+
+- Its likely that all devices get same IP address when they form the access point, and thus do remember to remove the access point in step 6, otherwise you’ll communicate with your own server in step 7.
+- With Android devices, you can have connection only to one WLAN Access point, thus if you had any active WLAN connections, they will be disconnected when you start connecting in step 5.
+
+I made simple example showing how the fix number two works, and you can find it from Github under the DrJukka/MyWifiMesh. Do note that its not fully finalized, and is just used for proof of concept for further development.
+
+This entry was posted in Uncategorized on March 9, 2015.

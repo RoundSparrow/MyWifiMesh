@@ -4,5 +4,7 @@
     <string name="app_name">MyWifiMesh</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    <string name="action_connect_socket">Connect Socket</string>
+    <string name="action_send_socket">Send Socket</string>
 
 </resources>
