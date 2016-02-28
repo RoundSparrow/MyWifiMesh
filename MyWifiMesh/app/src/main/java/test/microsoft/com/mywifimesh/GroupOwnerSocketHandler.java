@@ -2,7 +2,6 @@
 package test.microsoft.com.mywifimesh;
 
 import android.content.Context;
-import android.content.Intent;
 import android.os.Handler;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
@@ -12,7 +11,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * The implementation of a ServerSocket handler. This is used by the wifi p2p
+ * The implementation of a ServerSocket chatManagerHandler. This is used by the wifi p2p
  * group owner.
  */
 public class GroupOwnerSocketHandler extends Thread {
@@ -22,7 +21,7 @@ public class GroupOwnerSocketHandler extends Thread {
 
     LocalBroadcastManager broadcaster;
     ServerSocket socket = null;
-    private Handler handler;
+    private Handler chatManagerHandler;
     private static final String TAG = "GroupOwnerSocketHandler";
     private ChatManager chat;
 
@@ -31,8 +30,8 @@ public class GroupOwnerSocketHandler extends Thread {
         try {
             this.broadcaster = LocalBroadcastManager.getInstance(context);
             socket = new ServerSocket(port);
-            this.handler = handler;
-            Log.d("GroupOwnerSocketHandler", "Socket Started");
+            this.chatManagerHandler = handler;
+            Log.d("GroupOwnerSocketHandler", "Socket Started on port " + port);
         } catch (Exception e) {
             WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_GROUP_VALUES, DSS_GROUP_MESSAGE, e.toString(), true /* ERROR */);
             throw e;
@@ -54,8 +53,10 @@ public class GroupOwnerSocketHandler extends Thread {
                 // A blocking operation. Initiate a ChatManager instance when
                 // there is a new connection
                 Socket  s = socket.accept();
-                Log.d(TAG, "Launching the Group I/O handler");
-                chat = new ChatManager(s, handler, "Group");
+                MeshManager.getMeshState().chatServerSocketAcceptCount++;
+                Log.d(TAG, "Launching the Group I/O handler (GroupOwnerSocketHandler)");
+                // ToDo: one single ChatManager for all clients? Or should this be a local variable to allow multiple incoming clients?
+                chat = new ChatManager(s, chatManagerHandler, ChatManager.CHAT_SIDE_MANAGER);
                 new Thread(chat).start();
 
             } catch (Exception e) {

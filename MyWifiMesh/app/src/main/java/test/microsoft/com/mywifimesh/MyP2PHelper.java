@@ -3,10 +3,16 @@ package test.microsoft.com.mywifimesh;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Color;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.style.ForegroundColorSpan;
 
 import org.apache.http.conn.util.InetAddressUtils;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -49,32 +55,89 @@ public class MyP2PHelper {
         }
     }
 
-    static public void printLocalIpAddresses(Context context) {
+    static private NetworkInterface likelyTargetInterface0 = null;
+
+    static public NetworkInterface getLikelyTargetInterface(Context context, boolean forceRebuild)
+    {
+        if (forceRebuild)
+        {
+            likelyTargetInterface0 = null;
+        }
+        if (likelyTargetInterface0 == null)
+        {
+            boolean goodBuild = buildInterfaceOutput(context);
+        }
+        return likelyTargetInterface0;
+    }
+
+    static private SpannableStringBuilder stuff;
+
+    static private boolean buildInterfaceOutput(Context context)
+    {
         List<NetworkInterface> ifaces;
         try {
             ifaces = Collections.list(NetworkInterface.getNetworkInterfaces());
         } catch(SocketException e) {
-            showDialogBox("Got error: " + e.toString(), context);
-            return;
+            stuff = new SpannableStringBuilder("Got error: " + e.toString());
+            return false;
         }
-        String stuff = "Local IP addresses: \n";
+
+        MeshManager.getMeshState().netWifiPeerToPeerLikelyMyInet4Address0 = null;
+        MeshManager.getMeshState().netWifiPeerToPeerLikelyMyInet6Address0 = null;
+
+        stuff = new SpannableStringBuilder("Local IP addresses: \n");
         for(NetworkInterface iface : ifaces) {
             for(InetAddress addr : Collections.list(iface.getInetAddresses())) {
-                String desc = MyP2PHelper.ipAddressToString(addr);
-                if(addr.isLoopbackAddress()) desc += " (loopback)\n";
-                if(addr.isLinkLocalAddress()) desc += " (link-local)\n";
-                if(addr.isSiteLocalAddress()) desc += " (site-local)\n";
-                if(addr.isMulticastAddress()) desc += " (multicast)\n";
+                String interfaceAddress = MyP2PHelper.ipAddressToString(addr);
 
-                stuff += "\t" + iface.getName() + ": " + desc;
+                SpannableString interfaceDescription = WifiSettingsHelper.getFormattedLinkTypeString(addr);
+
+                SpannableString outInterfaceName = new SpannableString(iface.getName());
+                // highlight the interfaces that look to be Wifi Direct
+                if (iface.getName().startsWith("p2p"))
+                {
+                    outInterfaceName.setSpan(new ForegroundColorSpan(Color.BLUE), 0, outInterfaceName.length(), 0);
+                    if (addr.isSiteLocalAddress()) {
+                        likelyTargetInterface0 = iface;
+                        if (addr instanceof Inet4Address)
+                        {
+                            MeshManager.getMeshState().netWifiPeerToPeerLikelyMyInet4Address0 = addr;
+                        }
+                        if (addr instanceof Inet6Address)
+                        {
+                            MeshManager.getMeshState().netWifiPeerToPeerLikelyMyInet6Address0 = addr;
+                        }
+                        interfaceDescription = TextStyleHelper.colorTextBoldText(interfaceDescription, Color.GREEN);
+                    }
+                }
+                stuff.append("\t");
+                stuff.append(outInterfaceName);
+                stuff.append(": " );
+                stuff.append(interfaceAddress);
+                stuff.append(" (");
+                stuff.append(interfaceDescription);
+                stuff.append(")\n");
             }
         }
 
-        showDialogBox(stuff, context);
+        return true;
+    }
+
+
+    static public void printLocalIpAddresses(Context context) {
+
+        boolean goodBuild = buildInterfaceOutput(context);
+        if (! goodBuild)
+        {
+            showDialogBox(stuff, context);
+        }
+        else {
+            showDialogBox(stuff, context);
+        }
     }
 
     // Dialog box
-    public static void showDialogBox(String message,Context context) {
+    public static void showDialogBox(SpannableStringBuilder message, Context context) {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(context);
         alertDialogBuilder.setMessage(message);
 

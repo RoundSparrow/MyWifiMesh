@@ -19,6 +19,7 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION;
@@ -35,6 +36,7 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
     static final public String DSS_WIFIAP_SERVERADDRESS = "test.microsoft.com.mywifimesh.DSS_WIFIAP_SERVERADDRESS";
     static final public String DSS_WIFIAP_INETADDRESS = "test.microsoft.com.mywifimesh.DSS_WIFIAP_INETADDRESS";
 
+    public static AtomicInteger timesCreated = new AtomicInteger(0);
     WifiAccessPoint that = this;
     LocalBroadcastManager broadcaster;
     Context context;
@@ -62,6 +64,7 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
             debug_print("This device does not support Wi-Fi Direct");
         } else {
 
+            final int onRun = timesCreated.incrementAndGet();
             channel = p2p.initialize(this.context, this.context.getMainLooper(), this);
 
             receiver = new AccessPointReceiver();
@@ -78,7 +81,7 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
             p2p.createGroup(channel, new WifiP2pManager.ActionListener() {
                 @Override
                 public void onSuccess() {
-                    debug_print("Creating Local Group ");
+                    debug_print("P2P createGroup success, run " + onRun);
                 }
 
                 @Override
@@ -122,18 +125,18 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
     @Override
     public void onGroupInfoAvailable(WifiP2pGroup group) {
         try {
-            Collection<WifiP2pDevice>  devlist = group.getClientList();
+            Collection<WifiP2pDevice> devlist = group.getClientList();
 
             int numm = 0;
-            for (WifiP2pDevice peer : group.getClientList()) {
+            for (WifiP2pDevice peer : devlist) {
                 numm++;
-                debug_print("Client " + numm + " : "  + peer.deviceName + " " + peer.deviceAddress);
+                debug_print("Client " + numm + ": "  + peer.deviceName + " " + peer.deviceAddress);
             }
 
+            MeshManager.getMeshState().peer2PeerGroupClientCount = numm;
             if(mNetworkName.equals(group.getNetworkName()) && mPassphrase.equals(group.getPassphrase())){
                 debug_print("Already have local service for " + mNetworkName + " ," + mPassphrase);
             }else {
-
                 mNetworkName = group.getNetworkName();
                 mPassphrase = group.getPassphrase();
                 startLocalService("NI:" + group.getNetworkName() + ":" + group.getPassphrase() + ":" + mInetAddress);
@@ -145,17 +148,17 @@ public class WifiAccessPoint implements WifiP2pManager.ConnectionInfoListener,Wi
         }
     }
 
-    private void startLocalService(String instance) {
+    private void startLocalService(final String instance) {
         Map<String, String> record = new HashMap<String, String>();
         record.put("available", "visible");
 
         WifiP2pDnsSdServiceInfo service = WifiP2pDnsSdServiceInfo.newInstance( instance, MainActivity.SERVICE_TYPE, record);
 
-        debug_print("Add local service :" + instance);
+        debug_print("Attempt add local service:" + instance);
         p2p.addLocalService(channel, service, new WifiP2pManager.ActionListener() {
             @Override
             public void onSuccess() {
-                debug_print("Added local service");
+                debug_print("Added local service: " + instance);
             }
 
             @Override

@@ -15,13 +15,17 @@ import java.net.Socket;
  */
 public class ChatManager implements Runnable {
 
+    public static final String CHAT_SIDE_UNKNOWN = "unknown";
+    public static final String CHAT_SIDE_CLIENT = "client";
+    public static final String CHAT_SIDE_MANAGER = "GroupChatManager";
+
     private Socket socket = null;
-    private Handler handler;
-    String side;
+    private Handler chatManagerHandler;
+    String side = CHAT_SIDE_UNKNOWN;
 
     public ChatManager(Socket socket, Handler handler, String who) {
         this.socket = socket;
-        this.handler = handler;
+        this.chatManagerHandler = handler;
         this.side = who;
     }
 
@@ -29,27 +33,29 @@ public class ChatManager implements Runnable {
     private OutputStream oStream;
     private static final String TAG = "ChatHandler";
 
+
     @Override
     public void run() {
         try {
-
             iStream = socket.getInputStream();
             oStream = socket.getOutputStream();
             byte[] buffer = new byte[1048576]; //Megabyte buffer
-            int bytes;
-            handler.obtainMessage(MainActivity.MY_HANDLE, this).sendToTarget();
+            int bytesCount;
+
+            chatManagerHandler.obtainMessage(MeshManagerHandler.CHAT_WRITE_MESSAGE, this).sendToTarget();
 
             while (true) {
                 try {
                     // Read from the InputStream
-                    bytes = iStream.read(buffer);
-                    if (bytes == -1) {
+                    bytesCount = iStream.read(buffer);
+                    if (bytesCount == -1) {
                         break;
                     }
 
                     // Send the obtained bytes to the UI Activity
                     Log.d(TAG, "Rec:" + String.valueOf(buffer));
-                    handler.obtainMessage(MainActivity.MESSAGE_READ,bytes, -1, buffer).sendToTarget();
+                    MeshManager.getMeshState().chatLastGoodIncomingWhen = System.currentTimeMillis();
+                    chatManagerHandler.obtainMessage(MeshManagerHandler.CHAT_MESSAGE_READ, bytesCount, -1, buffer).sendToTarget();
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     WifiP2pHelper.forwardDebugPrintGlobal("CM", "IOException Reading " + e.getMessage(), true /* ERROR */);
@@ -67,12 +73,17 @@ public class ChatManager implements Runnable {
                 Log.e(TAG, "IOException ChatManager socket.close()");
             }
         }
+        MeshManager.getMeshState().chatConnected = false;
     }
 
     public void write(byte[] buffer) {
         try {
             oStream.write(buffer);
+            MeshManager.getMeshState().chatLastGoodWriteWhen = System.currentTimeMillis();
+            MeshManager.getMeshState().chatConnected = true;
         } catch (IOException e) {
+            MeshManager.getMeshState().chatLastFailedWriteWhen = System.currentTimeMillis();
+            MeshManager.getMeshState().chatConnected = false;
             WifiP2pHelper.forwardDebugPrintGlobal("CM", "IOException on WRITE " + e.getMessage(), true /* ERROR */);
             Log.e(TAG, "Exception during write", e);
         }
@@ -80,5 +91,9 @@ public class ChatManager implements Runnable {
 
     String getSide(){
         return this.side;
+    }
+
+    public Socket getSocket() {
+        return socket;
     }
 }

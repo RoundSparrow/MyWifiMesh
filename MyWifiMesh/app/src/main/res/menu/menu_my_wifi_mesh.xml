@@ -13,6 +13,50 @@
         android:id="@+id/action_send_socket"
         android:orderInCategory="42"
         android:title="@string/action_send_socket"
+        android:enabled="false"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_ping_address"
+        android:orderInCategory="42"
+        android:title="@string/action_ping_address"
+        android:enabled="true"
+        app:showAsAction="never"/>
+
+
+    <item
+        android:id="@+id/action_wifi_disable_enable0"
+        android:orderInCategory="52"
+        android:title="@string/action_wifi_disable_enable0"
+        android:enabled="true"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_wifi_p2p_rename0"
+        android:orderInCategory="54"
+        android:title="@string/action_wifi_p2p_rename0"
+        android:enabled="true"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_wifi_p2p_force_on0"
+        android:orderInCategory="56"
+        android:title="@string/action_wifi_p2p_force_on0"
+        android:enabled="true"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_website_test_reset0"
+        android:orderInCategory="58"
+        android:title="@string/action_website_test_reset0"
+        android:enabled="true"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_wifi_ap_mode_try0"
+        android:orderInCategory="60"
+        android:title="@string/action_wifi_ap_mode_try0"
+        android:enabled="true"
         app:showAsAction="never"/>
 
 </menu>

@@ -20,6 +20,8 @@ import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.TextView;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION;
 import static android.net.wifi.p2p.WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION;
@@ -94,6 +96,8 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                         debug_print("\t" + numm + ": "  + peer.deviceName + " " + peer.deviceAddress);
                     }
 
+                    MeshManager.getMeshState().peersFoundCount = numm;
+
                     if(broadcaster != null) {
                         Intent intent = new Intent(DSS_WIFISS_PEERCOUNT);
                         intent.putExtra(DSS_WIFISS_COUNT, numm);
@@ -103,6 +107,7 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                     if(numm > 0){
                         startServiceDiscovery();
                     }else{
+                        MeshManager.getMeshState().peerDiscoveryLogA += "C";
                         startPeerDiscovery();
                     }
                 }
@@ -114,6 +119,9 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
                      if (serviceType.startsWith(MainActivity.SERVICE_TYPE)) {
 
+                         debug_print("P2P found our service: " + serviceType + " name " + instanceName + " device " + device.deviceName);
+                         MeshManager.setAccessPointFoundWhen(System.currentTimeMillis());
+
                          //instance name has AP information for Client connection
                         if(broadcaster != null) {
                             Intent intent = new Intent(DSS_WIFISS_PEERAPINFO);
@@ -121,20 +129,20 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                             broadcaster.sendBroadcast(intent);
                         }
 
-
                     } else {
-                        debug_print("Not our Service, :" + MainActivity.SERVICE_TYPE + "!=" + serviceType + ":");
+                        debug_print("P2P Not our Service: " + MainActivity.SERVICE_TYPE + "!=" + serviceType + " name " + instanceName);
                     }
 
+                    MeshManager.getMeshState().peerDiscoveryLogA += "A";
                     startPeerDiscovery();
                 }
             };
 
             p2p.setDnsSdResponseListeners(channel, serviceListener, null);
+            MeshManager.getMeshState().peerDiscoveryLogA += "B";
             startPeerDiscovery();
         }
     }
-
 
     public void Stop() {
         this.context.unregisterReceiver(receiver);
@@ -144,22 +152,34 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
     @Override
     public void onChannelDisconnected() {
-        //
+        debug_print_error("onChannelDisconnected");
     }
-    private void startPeerDiscovery() {
-        p2p.discoverPeers(channel, new WifiP2pManager.ActionListener() {
-            @Override
-            public void onSuccess() {
-                myServiceState = ServiceState.DiscoverPeer;
-                debug_print("Started peer discovery");
-            }
 
-            @Override
-            public void onFailure(int reason) {
-                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
-                debug_print_error("Starting peer discovery FAILed, ERROR code " + reason + " " + reasonWords);
-            }
-        });
+
+    public static AtomicBoolean discoverPeersRunning = new AtomicBoolean(false);
+
+    private void startPeerDiscovery() {
+        boolean notAlreadyRunning = discoverPeersRunning.compareAndSet(false, true);
+        if (notAlreadyRunning) {
+            p2p.discoverPeers(channel, new WifiP2pManager.ActionListener() {
+                @Override
+                public void onSuccess() {
+                    myServiceState = ServiceState.DiscoverPeer;
+                    MeshManager.getMeshState().peer2PeerDiscoverPeersSuccessWhen = System.currentTimeMillis();
+                    debug_print("P2P discoverPeers success {B}");
+                }
+
+                @Override
+                public void onFailure(int reason) {
+                    debug_print_error("P2P discoverPeers FAILed {B}, ERROR code " + reason + " " + WifiP2pHelper.messageForErrorCode(reason));
+                    discoverPeersRunning.set(false);
+                }
+            });
+        }
+        else
+        {
+            debug_print_error("startPeerDiscovery skip, already running");
+        }
     }
 
     private void stopPeerDiscovery() {
@@ -170,7 +190,7 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
             public void onFailure(int reason) {
                 String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
-                debug_print_error("Stopping peer discovery failed, ERROR code " + reason + " " + reasonWords);
+                debug_print_error("stopPeerDiscovery failed, ERROR code " + reason + " " + reasonWords);
             }
         });
     }
@@ -189,13 +209,12 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                     public void run() {
                         p2p.discoverServices(channel, new WifiP2pManager.ActionListener() {
                             public void onSuccess() {
-                                debug_print("Started service discovery");
+                                debug_print("PSP discoverServices success {A}");
                                 myServiceState = ServiceState.DiscoverService;
                             }
 
                             public void onFailure(int reason) {
-                                String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
-                                debug_print_error("Starting service discovery failed, error code " + reason + " " + reasonWords);
+                                debug_print_error("discoverServices failed {A}, error code " + reason + " " + WifiP2pHelper.messageForErrorCode(reason));
                             }
                         });
                     }
@@ -203,7 +222,7 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
             }
 
             public void onFailure(int reason) {
-                debug_print("Adding service request failed, error code " + reason);
+                debug_print_error("addServiceRequest failed {A}, error code " + reason);
                 // No point starting service discovery
             }
         });
@@ -218,7 +237,7 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
             public void onFailure(int reason) {
                 String reasonWords = WifiP2pHelper.messageForErrorCode(reason);
-                debug_print_error("Clearing service requests failed, error code " + reason + " " + reasonWords);
+                debug_print_error("clearServiceRequests failed, error code " + reason + " " + reasonWords);
             }
         });
     }
@@ -258,6 +277,7 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
 
                 if(state == WifiP2pManager.WIFI_P2P_DISCOVERY_STOPPED){
                     persTatu = persTatu + "Stopped.";
+                    MeshManager.getMeshState().peerDiscoveryLogA += "E";
                     startPeerDiscovery();
                 }else if(state == WifiP2pManager.WIFI_P2P_DISCOVERY_STARTED){
                     persTatu = persTatu + "Started.";
@@ -270,9 +290,11 @@ public class WifiServiceSearcher  implements WifiP2pManager.ChannelListener{
                 NetworkInfo networkInfo = (NetworkInfo) intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
                 if (networkInfo.isConnected()) {
                     debug_print("Connected");
+                    MeshManager.getMeshState().peerDiscoveryLogA += "G";
                     startPeerDiscovery();
                 } else{
                     debug_print("DIS-Connected");
+                    MeshManager.getMeshState().peerDiscoveryLogA += "H";
                     startPeerDiscovery();
                 }
             }

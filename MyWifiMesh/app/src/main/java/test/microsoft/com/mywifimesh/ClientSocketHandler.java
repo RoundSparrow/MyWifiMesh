@@ -2,13 +2,10 @@
 package test.microsoft.com.mywifimesh;
 
 import android.content.Context;
-import android.content.Intent;
 import android.os.Handler;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
-import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
@@ -20,7 +17,7 @@ public class ClientSocketHandler extends Thread {
 
     LocalBroadcastManager broadcaster;
     private static final String TAG = "ClientSocketHandler";
-    private Handler handler;
+    private Handler chatManagerHandler;
     private ChatManager chat;
     private String mAddress;
     private int mPort;
@@ -28,10 +25,11 @@ public class ClientSocketHandler extends Thread {
 
     public ClientSocketHandler(Handler handler, String groupOwnerAddress, int port,Context context) {
         this.broadcaster = LocalBroadcastManager.getInstance(context);
-        this.handler = handler;
+        this.chatManagerHandler = handler;
         this.mAddress = groupOwnerAddress;
         this.mPort = port;
     }
+
 
     @Override
     public void run() {
@@ -41,8 +39,8 @@ public class ClientSocketHandler extends Thread {
         try {
             socket.bind(null);
             socket.connect(serverSocketAddress, SOCKET_CONNECT_TIMEOUT);
-            Log.d(TAG, "Launching the I/O handler");
-            chat = new ChatManager(socket, handler, "SocketClient");
+            Log.d(TAG, "Launching the I/O handler (ChatManager)");
+            chat = new ChatManager(socket, chatManagerHandler, ChatManager.CHAT_SIDE_CLIENT);
             new Thread(chat).start();
 
         } catch (Exception e) {

@@ -97,6 +97,7 @@ public class WifiConnection {
         return this.intetAddress;
     }
 
+
     private class WiFiConnectionReceiver extends BroadcastReceiver {
 
         @Override
@@ -105,10 +106,10 @@ public class WifiConnection {
             if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)) {
                 NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                 if(info != null) {
-
                     if (info.isConnected()) {
                         hadConnection = true;
                         mConectionState = ConectionStateConnected;
+                        MeshManager.getMeshState().netWifiConnectedCount++;
                     }else if(info.isConnectedOrConnecting()) {
                         mConectionState = ConectionStateConnecting;
                     }else {
@@ -119,8 +120,8 @@ public class WifiConnection {
                         }
                     }
 
-                    // Send message
-                    WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFICON_VALUES, DSS_WIFICON_MESSAGE, "DetailedState: " + info.getDetailedState(), false /* Not error */);
+                    // show message
+                    WifiP2pHelper.forwardDebugPrint(broadcaster, DSS_WIFICON_VALUES, DSS_WIFICON_MESSAGE, "NI DetailedState: " + info.getDetailedState() + " " + info.getTypeName(), false /* Not error */);
 
                     // Send actual state
                     if (broadcaster != null) {
@@ -131,7 +132,8 @@ public class WifiConnection {
                 }
 
                 WifiInfo wiffo = intent.getParcelableExtra(WifiManager.EXTRA_WIFI_INFO);
-                if(wiffo != null){
+                if (wiffo != null){
+                    MeshManager.getMeshState().netWifiGotInfo = wiffo;
                     if(broadcaster != null) {
                         Intent snInt = new Intent(DSS_WIFICON_SERVERADDRESS);
                         snInt.putExtra(DSS_WIFICON_INETADDRESS, wiffo.getIpAddress());

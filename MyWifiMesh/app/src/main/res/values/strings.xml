@@ -7,4 +7,12 @@
     <string name="action_connect_socket">Connect Socket</string>
     <string name="action_send_socket">Send Socket</string>
 
+    <string name="action_wifi_disable_enable0">Wifi Off-On</string>
+    <string name="action_ping_address">Ping Address</string>
+
+    <string name="action_wifi_p2p_rename0">Wifi P2P Rename</string>
+    <string name="action_wifi_p2p_force_on0">P2P Force ON</string>
+    <string name="action_website_test_reset0">Reset Website Test</string>
+    <string name="action_wifi_ap_mode_try0">WiFi AP Mode Try0</string>
+
 </resources>
